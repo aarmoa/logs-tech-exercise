@@ -1,0 +1,25 @@
+{
+  "name": "logs-tech-exercise",
+  "version": "1.0.0",
+  "description": "Technical exercise",
+  "main": "logsCheck.js",
+  "dependencies": {
+    "chai": "^4.1.1"
+  },
+  "devDependencies": {
+    "mocha": "^3.5.0"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aarmoa/logs-tech-exercise.git"
+  },
+  "author": "Abel Armoa",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/aarmoa/logs-tech-exercise/issues"
+  },
+  "homepage": "https://github.com/aarmoa/logs-tech-exercise#readme"
+}
