@@ -21,12 +21,13 @@ WarningLogsNotifier.prototype.notify = function(notificationChannel) {
 function NotifierBuilder() {};
 NotifierBuilder.prototype.build = function(logs) {
    var notificationClass;
+   
    if(logs.length > 0) {
        notificationClass = WarningLogsNotifier;
    } else {
        notificationClass = DummyNotifier;
    };
-
+   
    return new notificationClass(logs);
 };
 
@@ -71,8 +72,37 @@ LogsRetriever.prototype.logsPromise = function(aDate) {
                     'content-type': 'application/json' 
                 } 
             };
-       return rp(options);
-    }))
+            return rp(options);
+        }))
+
+};
+
+function NotificationProcess(aConnectionSettings, aDate) {
+    this.connectionSettings = aConnectionSettings;
+    this.date = aDate;
+}
+NotificationProcess.prototype.run = function() {
+    var tokenRetriever = new ManagementAPITokenRetriever(this.connectionSettings);
+    var token = tokenRetriever.tokenPromise();
+    var logsRetriever = new LogsRetriever(this.connectionSettings, token);
+    var logs = logsRetriever.logsPromise(this.date);
+    var notificationChannel = {};
+    notificationChannel.notify = function(aNotifier) {
+        console.log('*NOTIFICATION*\nDescription: '
+            + aNotifier.description + '\n'
+            + 'Affected clients: ' + 
+            Array.from(aNotifier.clients.values()).toString());
+    }
+    
+    logs
+    .then(function(aLogsString) {
+        var logs = JSON.parse(aLogsString);
+        var notifier = new NotifierBuilder().build(logs);
+        notifier.notify(notificationChannel);
+    })
+    .catch(function (error) {
+        console.log('An error ocurred while retrieving the logs: ' + error);
+    });
 };
 
 var webtask = function (context, cb) {
@@ -84,4 +114,5 @@ webtask.WarningLogsNotifier = WarningLogsNotifier;
 webtask.NotifierBuilder = NotifierBuilder;
 webtask.ManagementAPITokenRetriever = ManagementAPITokenRetriever;
 webtask.LogsRetriever = LogsRetriever;
+webtask.NotificationProcess = NotificationProcess;
 module.exports = webtask
