@@ -1,4 +1,5 @@
-var rp = require('request-promise');
+const rp = require('request-promise');
+const nodemailer = require('nodemailer');
 
 function DummyNotifier(logs) {};
 DummyNotifier.prototype.notify = function(notificationChannel) {
@@ -30,6 +31,62 @@ NotifierBuilder.prototype.build = function(logs) {
    
    return new notificationClass(logs);
 };
+
+function ConsoleNotificationChannel() {};
+ConsoleNotificationChannel.prototype.notify = function(aNotifier) {
+    console.log('*NOTIFICATION*\nDescription: '
+        + aNotifier.description + '\n'
+        + 'Affected clients: ' + 
+        Array.from(aNotifier.clients.values()).toString());
+}
+
+function EmailNotificationChannel(aSenderAddress, aReceiverAddress, aSubject) {
+    this.sender = aSenderAddress;
+    this.receiver = aReceiverAddress;
+    this.subject = aSubject;
+};
+EmailNotificationChannel.prototype.mailBody = function(aNotifier) {
+    var body = 'Dear Auth0 user:<br><br> '
+        + 'We are sending you this notification because we think there could be a problem '
+        + 'in the configuration of some of your clients.<br><br>'
+        + aNotifier.description + '<br><br>'
+        + 'Affected clients: ' 
+        + Array.from(aNotifier.clients.values()).toString();
+
+    return body
+}
+EmailNotificationChannel.prototype.notify = function(aNotifier) {
+    var self = this;
+
+    nodemailer.createTestAccount(function(err, account) {
+        var transporter = nodemailer.createTransport({
+            host: 'smtp.ethereal.email',
+            port: 587,
+            secure: false, // true for 465, false for other ports
+            auth: {
+                user: account.user,
+                pass: account.pass
+            }
+        });
+        
+        var mailOptions = {
+            from: self.sender,
+            to: self.receiver,
+            subject: self.subject,
+            html: self.mailBody(aNotifier)
+        };
+        
+        transporter.sendMail(mailOptions, function(error, info) {
+            if (error) {
+                return console.log(error);
+            }
+            console.log('Message sent: %s', info.messageId);
+            console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+        
+        });
+    });
+        
+}
 
 function ManagementAPITokenRetriever(aConnectionSettings) {
     this.connectionSettings = aConnectionSettings;
@@ -86,13 +143,10 @@ NotificationProcess.prototype.run = function() {
     var token = tokenRetriever.tokenPromise();
     var logsRetriever = new LogsRetriever(this.connectionSettings, token);
     var logs = logsRetriever.logsPromise(this.date);
-    var notificationChannel = {};
-    notificationChannel.notify = function(aNotifier) {
-        console.log('*NOTIFICATION*\nDescription: '
-            + aNotifier.description + '\n'
-            + 'Affected clients: ' + 
-            Array.from(aNotifier.clients.values()).toString());
-    }
+    var notificationChannel = 
+        new EmailNotificationChannel('support@auth0.com', 
+            'receiver@receiver.com', 
+            'Possible configuration error in one of your clients');
     
     logs
     .then(function(aLogsString) {

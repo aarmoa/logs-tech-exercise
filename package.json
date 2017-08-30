@@ -5,6 +5,7 @@
   "main": "logsCheck.js",
   "dependencies": {
     "chai": "^4.1.1",
+    "nodemailer": "^4.1.0",
     "request": "^2.81.0",
     "request-promise": "^4.2.1"
   },
