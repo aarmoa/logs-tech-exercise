@@ -1,61 +1,27 @@
 var rp = require("request-promise");
+var webtask = require('./logsCheck.js');
+var ManagementAPITokenRetriver = webtask.ManagementAPITokenRetriever;
+var LogsRetriever = webtask.LogsRetriever;
 
 var settings = {
-    AUDIENCE:'',
-    DOMAIN:'',
-    CLIENT_ID:'',
-    CLIENT_SECRET:'',
-    GRANT_TYPE:''
-}
+    AUDIENCE:'https://aarmoa.auth0.com/api/v2/',
+    DOMAIN:'aarmoa.auth0.com',
+    CLIENT_ID:'DtDcrLXuqyUbadEvZrzX9ZGpckX9E71L',
+    CLIENT_SECRET:'XaXL0Mid3z4yXDDjlqOf8ULSI6WMCDl4e0C6__y6R73IVLspVFUII0m7PcJlqnVY',
+    GRANT_TYPE:'client_credentials'
+};
 
-function getManagementAPIToken(connectionSettings) {
-    var options = { 
-        method: 'POST',
-        url: 'https://' + connectionSettings.DOMAIN + '/oauth/token',
-        headers: { 'content-type': 'application/json' },
-        body: { 
-            grant_type: connectionSettings.GRANT_TYPE,
-            client_id: connectionSettings.CLIENT_ID,
-            client_secret: connectionSettings.CLIENT_SECRET,
-            audience: connectionSettings.AUDIENCE 
-        },
-        json: true 
-    };
-  
-    return rp(options);
-}
-
+var tokenRetriever = new ManagementAPITokenRetriver(settings);
 var dateFrom = new Date();
-var connectionSettings = settings;
+var token = tokenRetriever.tokenPromise();
+var logsRetriever = new LogsRetriever(settings, token);
+var logs = logsRetriever.logsPromise(dateFrom);
 
-    var token = getManagementAPIToken(connectionSettings);
-    
-    token
-    .then(function (aToken) {
-        var options = { 
-            method: 'GET',
-            url: 'https://' + 
-                connectionSettings.DOMAIN + 
-                '/api/v2/logs?q=type%3A%22w%22%20AND%20date%3A%5B' +
-                dateFrom.toISOString().substr(0, 10) + 
-                '%20TO%20*%7D%20AND%20description%3AYou%20are%20using%20Auth0%20development%20keys*',
-            headers: { 
-                authorization: 'Bearer ' + aToken.access_token,
-                'content-type': 'application/json' 
-            } 
-        };
-        
-        return rp(options).then(function (aLogsArray) {
-            console.log(aLogsArray);
-        })
-        .catch(function (error) {
-            throw new Error(error);
-        });
-    })
-    .catch(function (error) {
-        throw new Error(error);
-    });
-
-
-
-
+console.log('About to call then on result from getLogs');
+logs
+.then(function (aLogsArray) {
+    console.log(aLogsArray);
+})
+.catch(function (error) {
+    throw new Error(error);
+});

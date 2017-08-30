@@ -1,3 +1,5 @@
+var rp = require('request-promise');
+
 function DummyNotifier(logs) {};
 DummyNotifier.prototype.notify = function(notificationChannel) {
     console.log('No logs to be notified were detected.')
@@ -28,6 +30,51 @@ NotifierBuilder.prototype.build = function(logs) {
    return new notificationClass(logs);
 };
 
+function ManagementAPITokenRetriever(aConnectionSettings) {
+    this.connectionSettings = aConnectionSettings;
+}
+ManagementAPITokenRetriever.prototype.tokenPromise = function() {
+    var options = { 
+        method: 'POST',
+        url: 'https://' + this.connectionSettings.DOMAIN + '/oauth/token',
+        headers: { 'content-type': 'application/json' },
+        body: { 
+            grant_type: this.connectionSettings.GRANT_TYPE,
+            client_id: this.connectionSettings.CLIENT_ID,
+            client_secret: this.connectionSettings.CLIENT_SECRET,
+            audience: this.connectionSettings.AUDIENCE 
+        },
+        json: true 
+    };
+  
+    return rp(options);
+};
+
+function LogsRetriever(aConnectionSettings, aTokenPromise) {
+    this.connectionSettings = aConnectionSettings;
+    this.tokenPromise = aTokenPromise;
+}
+LogsRetriever.prototype.logsPromise = function(aDate) {
+    var date = aDate || new Date();
+    var domain = this.connectionSettings.DOMAIN;
+    return (this.tokenPromise
+        .then(function(aToken) {
+            var autenticationToken = aToken.access_token;
+            var options = { 
+                method: 'GET',
+                url: 'https://' + domain + 
+                    '/api/v2/logs?q=type%3A%22w%22%20AND%20date%3A%5B' +
+                    date.toISOString().substr(0, 10) + 
+                    '%20TO%20*%7D%20AND%20description%3AYou%20are%20using%20Auth0%20development%20keys*',
+                headers: { 
+                    authorization: 'Bearer ' + autenticationToken,
+                    'content-type': 'application/json' 
+                } 
+            };
+       return rp(options);
+    }))
+};
+
 var webtask = function (context, cb) {
     cb(null, { /*TODO*/ });
 }     
@@ -35,4 +82,6 @@ var webtask = function (context, cb) {
 webtask.DummyNotifier = DummyNotifier;
 webtask.WarningLogsNotifier = WarningLogsNotifier;
 webtask.NotifierBuilder = NotifierBuilder;
+webtask.ManagementAPITokenRetriever = ManagementAPITokenRetriever;
+webtask.LogsRetriever = LogsRetriever;
 module.exports = webtask
