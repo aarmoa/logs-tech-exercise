@@ -181,13 +181,12 @@ var webtask = function (context, cb) {
 
     context.storage.get(function (error, data) {
         if (error) return cb(error);
-        var todayFirstMoment = calculateTodayFirstMoment()
+        var todayFirstMoment = calculateTodayFirstMoment().toUTCString();
         data = data || { lastExecutionTime:todayFirstMoment };
-       
-        var process = new NotificationProcess(settings, data.lastExecutionTime);
+        var process = new NotificationProcess(settings, new Date(data.lastExecutionTime));
         process.run();
 
-        data.lastExecutionTime = new Date();
+        data.lastExecutionTime = new Date().toUTCString();
 
         context.storage.set(data, function (error) {
             if (error) return cb(error);

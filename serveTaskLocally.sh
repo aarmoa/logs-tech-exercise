@@ -1,0 +1,1 @@
+wt serve --hostname localhost --port 9000 --secrets-file webtaskSecrets.sec --storage-file storage.wt logsCheck.js
