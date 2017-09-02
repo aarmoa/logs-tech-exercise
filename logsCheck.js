@@ -113,7 +113,7 @@ function LogsRetriever(aConnectionSettings, aTokenPromise) {
     this.tokenPromise = aTokenPromise;
 }
 LogsRetriever.prototype.logsPromise = function(aDate) {
-    var date = aDate || new Date();
+    var date = aDate;
     var domain = this.connectionSettings.DOMAIN;
     return (this.tokenPromise
         .then(function(aToken) {
@@ -122,7 +122,7 @@ LogsRetriever.prototype.logsPromise = function(aDate) {
                 method: 'GET',
                 url: 'https://' + domain + 
                     '/api/v2/logs?q=type%3A%22w%22%20AND%20date%3A%5B' +
-                    date.toISOString().substr(0, 10) + 
+                    date.toISOString() + 
                     '%20TO%20*%7D%20AND%20description%3AYou%20are%20using%20Auth0%20development%20keys*',
                 headers: { 
                     authorization: 'Bearer ' + autenticationToken,
@@ -159,8 +159,43 @@ NotificationProcess.prototype.run = function() {
     });
 };
 
+function calculateTodayFirstMoment() {
+    var now = new Date();
+    return new Date(now.getFullYear(), 
+                    now.getMonth(), 
+                    now.getDate(), 
+                    0, 
+                    0, 
+                    0, 
+                    0);
+}
+
 var webtask = function (context, cb) {
-    cb(null, { /*TODO*/ });
+    var settings = {
+        AUDIENCE:context.secrets.AUDIENCE,
+        DOMAIN:context.secrets.DOMAIN,
+        CLIENT_ID:context.secrets.CLIENT_ID,
+        CLIENT_SECRET:context.secrets.CLIENT_SECRET,
+        GRANT_TYPE:context.secrets.GRANT_TYPE
+    };
+
+    context.storage.get(function (error, data) {
+        if (error) return cb(error);
+        var todayFirstMoment = calculateTodayFirstMoment()
+        data = data || { lastExecutionTime:todayFirstMoment };
+       
+        var process = new NotificationProcess(settings, data.lastExecutionTime);
+        process.run();
+
+        data.lastExecutionTime = new Date();
+
+        context.storage.set(data, function (error) {
+            if (error) return cb(error);
+        });
+    
+    });
+    
+    cb(null, { result:'Done'});
 }     
 
 webtask.DummyNotifier = DummyNotifier;
