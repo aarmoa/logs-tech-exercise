@@ -40,10 +40,12 @@ ConsoleNotificationChannel.prototype.notify = function(aNotifier) {
         Array.from(aNotifier.clients.values()).toString());
 }
 
-function EmailNotificationChannel(aSenderAddress, aReceiverAddress, aSubject) {
+function EmailNotificationChannel(aSenderAddress, aReceiverAddress, aSubject, anSMTPUser, anSMTPPass) {
     this.sender = aSenderAddress;
     this.receiver = aReceiverAddress;
     this.subject = aSubject;
+    this.smtpUser = anSMTPUser;
+    this.smtpPass = anSMTPPass;
 };
 EmailNotificationChannel.prototype.mailBody = function(aNotifier) {
     var body = 'Dear Auth0 user:<br><br> '
@@ -57,33 +59,31 @@ EmailNotificationChannel.prototype.mailBody = function(aNotifier) {
 }
 EmailNotificationChannel.prototype.notify = function(aNotifier) {
     var self = this;
-
-    nodemailer.createTestAccount(function(err, account) {
-        var transporter = nodemailer.createTransport({
-            host: 'smtp.ethereal.email',
-            port: 587,
-            secure: false, // true for 465, false for other ports
-            auth: {
-                user: account.user,
-                pass: account.pass
-            }
-        });
-        
-        var mailOptions = {
-            from: self.sender,
-            to: self.receiver,
-            subject: self.subject,
-            html: self.mailBody(aNotifier)
-        };
-        
-        transporter.sendMail(mailOptions, function(error, info) {
-            if (error) {
-                return console.log(error);
-            }
-            console.log('Message sent: %s', info.messageId);
-            console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
-        
-        });
+    var transportConfig = {
+        host: 'smtp.ethereal.email',
+        port: 587,
+        auth: {
+            user: this.smtpUser,
+            pass: this.smtpPass
+        }
+    };
+    
+    var transporter = nodemailer.createTransport(transportConfig);
+    
+    var mailOptions = {
+        from: self.sender,
+        to: self.receiver,
+        subject: self.subject,
+        html: self.mailBody(aNotifier)
+    };
+    
+    transporter.sendMail(mailOptions, function(error, info) {
+        if (error) {
+            return console.log(error);
+        }
+        console.log('Message sent: %s', info.messageId);
+        console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+    
     });
         
 }
@@ -146,7 +146,9 @@ NotificationProcess.prototype.run = function() {
     var notificationChannel = 
         new EmailNotificationChannel('support@auth0.com', 
             'receiver@receiver.com', 
-            'Possible configuration error in one of your clients');
+            'Possible configuration error in one of your clients',
+            this.connectionSettings.SMTP_USER,
+            this.connectionSettings.SMTP_PASS);
     
     logs
     .then(function(aLogsString) {
@@ -176,7 +178,9 @@ var webtask = function (context, cb) {
         DOMAIN:context.secrets.DOMAIN,
         CLIENT_ID:context.secrets.CLIENT_ID,
         CLIENT_SECRET:context.secrets.CLIENT_SECRET,
-        GRANT_TYPE:context.secrets.GRANT_TYPE
+        GRANT_TYPE:context.secrets.GRANT_TYPE,
+        SMTP_USER:context.secrets.SMTP_USER,
+        SMTP_PASS:context.secrets.SMTP_PASS
     };
 
     context.storage.get(function (error, data) {
