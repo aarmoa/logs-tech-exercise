@@ -40,12 +40,8 @@ ConsoleNotificationChannel.prototype.notify = function(aNotifier) {
         Array.from(aNotifier.clients.values()).toString());
 }
 
-function EmailNotificationChannel(aSenderAddress, aReceiverAddress, aSubject, anSMTPUser, anSMTPPass) {
-    this.sender = aSenderAddress;
-    this.receiver = aReceiverAddress;
-    this.subject = aSubject;
-    this.smtpUser = anSMTPUser;
-    this.smtpPass = anSMTPPass;
+function EmailNotificationChannel(aMailSettings) {
+    this.mailSettings = aMailSettings;
 };
 EmailNotificationChannel.prototype.mailBody = function(aNotifier) {
     var body = 'Dear Auth0 user:<br><br> '
@@ -58,23 +54,22 @@ EmailNotificationChannel.prototype.mailBody = function(aNotifier) {
     return body
 }
 EmailNotificationChannel.prototype.notify = function(aNotifier) {
-    var self = this;
     var transportConfig = {
-        host: 'smtp.ethereal.email',
-        port: 587,
+        host: this.mailSettings.SMTP_HOST,
+        port: this.mailSettings.SMTP_PORT,
         auth: {
-            user: this.smtpUser,
-            pass: this.smtpPass
+            user: this.mailSettings.SMTP_USER,
+            pass: this.mailSettings.SMTP_PASS
         }
     };
     
     var transporter = nodemailer.createTransport(transportConfig);
     
     var mailOptions = {
-        from: self.sender,
-        to: self.receiver,
-        subject: self.subject,
-        html: self.mailBody(aNotifier)
+        from: this.mailSettings.EMAIL_FROM_ADD,
+        to: this.mailSettings.EMAIL_TO_ADD,
+        subject: this.mailSettings.EMAIL_SUBJECT,
+        html: this.mailBody(aNotifier)
     };
     
     transporter.sendMail(mailOptions, function(error, info) {
@@ -132,21 +127,17 @@ LogsRetriever.prototype.logsPromise = function(aDate) {
 
 };
 
-function NotificationProcess(aConnectionSettings, aDate) {
-    this.connectionSettings = aConnectionSettings;
+function NotificationProcess(aManagementAPISettings, aMailSettings, aDate) {
+    this.managementAPISettings = aManagementAPISettings;
+    this.mailSettings = aMailSettings;
     this.date = aDate;
 }
 NotificationProcess.prototype.run = function() {
-    var tokenRetriever = new ManagementAPITokenRetriever(this.connectionSettings);
+    var tokenRetriever = new ManagementAPITokenRetriever(this.managementAPISettings);
     var token = tokenRetriever.tokenPromise();
-    var logsRetriever = new LogsRetriever(this.connectionSettings, token);
+    var logsRetriever = new LogsRetriever(this.managementAPISettings, token);
     var logs = logsRetriever.logsPromise(this.date);
-    var notificationChannel = 
-        new EmailNotificationChannel('support@auth0.com', 
-            'receiver@receiver.com', 
-            'Possible configuration error in one of your clients',
-            this.connectionSettings.SMTP_USER,
-            this.connectionSettings.SMTP_PASS);
+    var notificationChannel = new EmailNotificationChannel(this.mailSettings);
     
     logs
     .then(function(aLogsString) {
@@ -171,21 +162,31 @@ function calculateTodayFirstMoment() {
 }
 
 var webtask = function (context, cb) {
-    var settings = {
+    var managementAPISettings = {
         AUDIENCE:context.secrets.AUDIENCE,
         DOMAIN:context.secrets.DOMAIN,
         CLIENT_ID:context.secrets.CLIENT_ID,
         CLIENT_SECRET:context.secrets.CLIENT_SECRET,
-        GRANT_TYPE:context.secrets.GRANT_TYPE,
+        GRANT_TYPE:context.secrets.GRANT_TYPE        
+    };
+
+    var mailSettings = {
+        SMTP_HOST:context.secrets.SMTP_HOST,
+        SMTP_PORT:context.secrets.SMTP_PORT,
         SMTP_USER:context.secrets.SMTP_USER,
-        SMTP_PASS:context.secrets.SMTP_PASS
+        SMTP_PASS:context.secrets.SMTP_PASS,
+        EMAIL_FROM_ADD:context.secrets.EMAIL_FROM_ADD,
+        EMAIL_TO_ADD:context.secrets.EMAIL_TO_ADD,
+        EMAIL_SUBJECT:context.secrets.EMAIL_SUBJECT,
     };
 
     context.storage.get(function (error, data) {
         if (error) return cb(error);
         var todayFirstMoment = calculateTodayFirstMoment().toUTCString();
         data = data || { lastExecutionTime:todayFirstMoment };
-        var process = new NotificationProcess(settings, new Date(data.lastExecutionTime));
+        var process = new NotificationProcess(managementAPISettings, 
+                                                mailSettings, 
+                                                new Date(data.lastExecutionTime));
         process.run();
 
         data.lastExecutionTime = new Date().toUTCString();

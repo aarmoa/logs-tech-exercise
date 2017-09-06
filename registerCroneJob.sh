@@ -1,1 +1,1 @@
-wt cron schedule --name logsCheck --secrets-file=webtaskSecrets.sec --ignore-package-json 1m https://github.com/aarmoa/logs-tech-exercise/blob/master/logsCheck.js
+wt cron schedule --name logsCheck --secrets-file=webtaskSecrets.sec --ignore-package-json 1m logsCheck.js
