@@ -7,8 +7,8 @@ DummyNotifier.prototype.notify = function(notificationChannel) {
 };
 
 function WarningLogsNotifier(logs) {
-    if(logs.lenght === 0) {
-        new Error('A WarningLogsNotifier should be created with at least one log');
+    if(logs.length === 0) {
+        throw new Error('A WarningLogsNotifier should be created with at least one log');
     }
     this.description = logs[0].description;
     this.clients = new Set(logs.map(function(aLog) {
